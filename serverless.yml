@@ -15,18 +15,31 @@ service: download-files-service # NOTE: update this with your service name
 
 # You can pin your service to only deploy with a specific Serverless version
 # Check out our docs for more details
-# frameworkVersion: "=X.X.X"
+frameworkVersion: ">=1.1.0"
+
+custom:
+  bucket: lambda-input-files
+  mp3bucket: lambda1-output-files
+  wavbucket: wav-bucket
 
 provider:
   name: aws
-  runtime: python2.7
-
+  runtime: python3.6
+  profile: mnm-profile
 # you can overwrite defaults here
 #  stage: dev
 #  region: us-east-1
 
 # you can add statements to the Lambda function's IAM Role here
-#  iamRoleStatements:
+  iamRoleStatements:
+    - Effect: 'Allow'
+      Action:
+        - 's3:*'
+        - 'elastictranscoder:Read*'
+        - 'elastictranscoder:List*'
+        - 'elastictranscoder:*Job'
+      Resource: "*"
+
 #    - Effect: "Allow"
 #      Action:
 #        - "s3:ListBucket"
@@ -55,10 +68,41 @@ provider:
 #    - exclude-me-dir/**
 
 functions:
-  download-files-function:
+  download_files_function: 
+    name: download_files_function
     handler: handler.entrypoint
     events: 
-      -s3: ${env:BUCKET}
+      - s3:  
+          bucket: ${self:custom.bucket}
+          event: s3:ObjectCreated:*
+          rules:
+      	    - suffix: .csv
+    
+
+  convert_files_function:
+    name: convert_files_function
+    handler: convert_handler.entrypoint
+    events:
+      - s3:
+          bucket: ${self:custom.mp3bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .mp3
+    
+
+  get_prediction_function:
+    name: get_prediction_function
+    handler: get_prediction_handler.entrypoint
+    events:
+      - s3:
+          bucket: ${self:custom.wavbucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .wav 
+    
+
+
+
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details
@@ -90,8 +134,7 @@ functions:
 #    Define function environment variables here
 #    environment:
 #      variable2: value2
-	environment:
-		BUCKET: lambda-input-files
+	
 # you can add CloudFormation resource templates here
 #resources:
 #  Resources:
@@ -103,3 +146,9 @@ functions:
 #     NewOutput:
 #       Description: "Description for the output"
 #       Value: "Some output value"
+
+plugins:
+  - serverless-offline
+#  - serverless-python-requirements
+
+
